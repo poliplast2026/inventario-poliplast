@@ -301,7 +301,7 @@
           return;
         }
         cont.innerHTML = categorias.map(function (c) {
-          return '<button class="cat-btn" onclick="elegirCategoria(' + JSON.stringify(c) + ')">📦 ' + c + '</button>';
+          return "<button class=\"cat-btn\" onclick='elegirCategoria(" + JSON.stringify(c) + ")'>📦 " + c + '</button>';
         }).join('');
       } catch (err) {
         document.getElementById('statusCategorias').textContent = 'Error: ' + err.message;
