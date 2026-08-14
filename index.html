@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inventario — Grupo Poliplast</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.3);
+      margin-top: 20px;
+    }
+    h1 { font-size: 19px; margin: 0 0 4px; text-align: center; }
+    .sub { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+    label.campo { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+    input[type=text], input[type=number], select {
+      width: 100%; padding: 14px; font-size: 16px; border-radius: 10px;
+      border: 1px solid #334155; background: #0f172a; color: #f1f5f9; margin-bottom: 14px;
+    }
+    select { appearance: none; }
+    button {
+      width: 100%; padding: 16px; font-size: 16px; font-weight: 600; border: none;
+      border-radius: 10px; margin-bottom: 10px; cursor: pointer; transition: opacity .15s;
+    }
+    button:disabled { opacity: .35; cursor: not-allowed; }
+    button:active { opacity: .8; }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-guardar { background: #22c55e; color: #052e14; }
+    .btn-saltar { background: #334155; color: #f1f5f9; }
+    .btn-cancelar { background: #334155; color: #f1f5f9; }
+    .btn-salir { background: #ef4444; color: #350707; }
+    .status { text-align: center; font-size: 13px; color: #94a3b8; margin: 6px 0; min-height: 18px; }
+    .usuario { text-align: center; font-size: 14px; color: #94a3b8; margin-bottom: 4px; }
+    .deposito { text-align: center; font-size: 12px; color: #64748b; margin-bottom: 18px; }
+    .hidden { display: none !important; }
+    .categorias { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+    .cat-btn {
+      background: #273449; border: 1px solid #334155; border-radius: 12px;
+      padding: 20px 10px; font-size: 15px; font-weight: 600; text-align: center;
+      margin-bottom: 0;
+    }
+    .cat-btn:active { background: #334155; }
+    .progreso { text-align: center; font-size: 12px; color: #64748b; margin-bottom: 6px; }
+    .barra { height: 6px; background: #334155; border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+    .barra-rellena { height: 100%; background: #6366f1; transition: width .2s; }
+    .categoria-nombre { text-align: center; font-size: 13px; color: #94a3b8; margin-bottom: 4px; }
+    .codigo { text-align: center; font-size: 24px; font-weight: 800; letter-spacing: .5px; margin-bottom: 4px; }
+    .nombre-producto { text-align: center; font-size: 15px; color: #cbd5e1; margin-bottom: 22px; min-height: 20px; }
+    .stepper { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .stepper button { width: 56px; flex: none; margin: 0; padding: 16px 0; font-size: 24px; background: #334155; color: #f1f5f9; }
+    .stepper input { text-align: center; margin: 0; font-size: 22px; font-weight: 700; }
+    .link-reset { display:block; text-align:center; margin-top:16px; font-size:12px; color:#64748b; text-decoration: underline; cursor:pointer; }
+    .link-salir { display:block; text-align:center; margin-top:6px; font-size:12px; color:#f87171; text-decoration: underline; cursor:pointer; }
+  </style>
+</head>
+<body>
+
+  <div class="card" id="vistaIdentificacion">
+    <h1>Inventario — Grupo Poliplast</h1>
+    <div class="sub">Poné tu nombre y elegí el depósito. Queda guardado en este celular, no hay que repetirlo cada vez.</div>
+    <label class="campo">Nombre y apellido</label>
+    <input type="text" id="nombreInput" placeholder="Nombre y apellido">
+    <label class="campo">Depósito</label>
+    <select id="depositoInput"></select>
+    <button class="btn-primary" onclick="empezar()">Empezar</button>
+    <div class="status" id="statusIdentificacion"></div>
+  </div>
+
+  <div class="card hidden" id="vistaCategorias">
+    <div class="usuario" id="usuarioTexto"></div>
+    <div class="deposito" id="depositoTexto"></div>
+    <div class="sub">Elegí la categoría que vas a contar</div>
+    <div class="categorias" id="listaCategorias"></div>
+    <div class="status" id="statusCategorias"></div>
+    <div class="status" id="indicadorCola" style="color:#f59e0b;"></div>
+    <div class="link-reset" onclick="descargarCsv()">⬇️ Descargar CSV del conteo</div>
+    <div class="link-reset" onclick="mostrarQr()">🔗 QR de acceso a esta app</div>
+    <div class="link-reset" onclick="cambiarUsuario()">Cambiar usuario / depósito</div>
+  </div>
+
+  <div class="card hidden" id="vistaQr">
+    <h1>QR de acceso</h1>
+    <div class="sub">Escaneá este código con la cámara del celular para abrir esta misma app. Sirve para compartirlo o para pegarlo impreso en el depósito.</div>
+    <img id="qrImagen" style="display:block; margin: 0 auto 16px; border-radius: 12px; background:#fff; padding:12px; width:220px; height:220px;" alt="Código QR de acceso">
+    <div class="status" id="qrLinkTexto" style="word-break: break-all; margin-bottom: 16px;"></div>
+    <button class="btn-primary" onclick="mostrarVista('vistaCategorias')">Volver</button>
+  </div>
+
+  <div class="card hidden" id="vistaConteo">
+    <div class="categoria-nombre" id="categoriaTexto"></div>
+    <div class="progreso" id="progresoTexto"></div>
+    <div class="barra"><div class="barra-rellena" id="barraRellena"></div></div>
+
+    <div class="codigo" id="codigoTexto"></div>
+    <div class="nombre-producto" id="nombreProductoTexto"></div>
+
+    <div class="stepper">
+      <button onclick="sumarCantidad(-1)">−</button>
+      <input type="number" id="cantidadInput" value="0" min="0" inputmode="numeric">
+      <button onclick="sumarCantidad(1)">+</button>
+    </div>
+
+    <button class="btn-guardar" onclick="guardarYSiguiente()">✅ Guardar y siguiente</button>
+    <button class="btn-saltar" onclick="saltarProducto()">⏭️ No contar este, siguiente</button>
+
+    <div class="status" id="statusConteo"></div>
+    <div class="link-salir" onclick="pedirSalir()">🚪 Salir de esta categoría</div>
+  </div>
+
+  <div class="card hidden" id="vistaSalir">
+    <div class="sub" id="mensajeSalir" style="font-size:15px; color:#f1f5f9;"></div>
+    <button class="btn-cancelar" onclick="cancelarSalir()">Seguir contando</button>
+    <button class="btn-salir" onclick="confirmarSalir()">Salir de todos modos</button>
+  </div>
+
+  <script>
+    // ⚠️ URL del Apps Script de Inventario (/exec). Si alguna vez se crea una
+    // implementación nueva (en vez de "Nueva versión" sobre la misma), hay que actualizarla.
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyGdhpzT7owDBPt1fhUiiREHKGD7xQ7p1MIiC5M5SFVDTEugJGbC4AKCSH3RDTzXDLbNA/exec';
+
+    const NOMBRE_KEY = 'inventario_nombre';
+    const DEPOSITO_KEY = 'inventario_deposito';
+    const COLA_KEY = 'inventario_cola_pendiente';
+
+    let categoriaActual = null;
+    let listaProductos = [];
+    let indiceActual = 0;
+
+    // ---- Llamadas al backend (Google Apps Script) ----
+    function llamarApi(action, params) {
+      const url = API_URL + '?action=' + encodeURIComponent(action) + '&params=' + encodeURIComponent(JSON.stringify(params || []));
+      return fetch(url)
+        .catch(function () {
+          const err = new Error('Sin conexión a internet.');
+          err.networkError = true;
+          throw err;
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.error || 'Error desconocido');
+          return res.data;
+        });
+    }
+
+    // ---- Cola de conteos pendientes (por si falla la conexión al guardar) ----
+    function encolarConteo(params) {
+      const cola = JSON.parse(localStorage.getItem(COLA_KEY) || '[]');
+      cola.push({ params: params, intentos: 0 });
+      localStorage.setItem(COLA_KEY, JSON.stringify(cola));
+      actualizarIndicadorCola();
+    }
+
+    function actualizarIndicadorCola() {
+      const cola = JSON.parse(localStorage.getItem(COLA_KEY) || '[]');
+      const el = document.getElementById('indicadorCola');
+      if (!el) return;
+      el.textContent = cola.length ? '⏳ ' + cola.length + ' conteo(s) pendiente(s) de enviar (sin conexión)' : '';
+    }
+
+    async function procesarColaPendiente() {
+      const cola = JSON.parse(localStorage.getItem(COLA_KEY) || '[]');
+      if (!cola.length) return;
+      const restante = [];
+      for (const item of cola) {
+        try {
+          const url = API_URL + '?action=guardarConteo&params=' + encodeURIComponent(JSON.stringify(item.params));
+          const r = await fetch(url);
+          await r.json();
+        } catch (e) {
+          item.intentos++;
+          if (item.intentos < 50) restante.push(item);
+        }
+      }
+      localStorage.setItem(COLA_KEY, JSON.stringify(restante));
+      actualizarIndicadorCola();
+    }
+
+    window.addEventListener('online', procesarColaPendiente);
+    setInterval(procesarColaPendiente, 30000);
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    async function init() {
+      actualizarIndicadorCola();
+      procesarColaPendiente();
+
+      const nombre = localStorage.getItem(NOMBRE_KEY);
+      const deposito = localStorage.getItem(DEPOSITO_KEY);
+
+      try {
+        const depositos = await llamarApi('getDepositos', []);
+        const select = document.getElementById('depositoInput');
+        select.innerHTML = depositos.map(function (d) { return '<option value="' + d + '">' + d + '</option>'; }).join('');
+      } catch (err) {
+        document.getElementById('statusIdentificacion').textContent = 'Error cargando depósitos: ' + err.message;
+      }
+
+      if (nombre && deposito) {
+        document.getElementById('nombreInput').value = nombre;
+        document.getElementById('depositoInput').value = deposito;
+        mostrarCategorias(nombre, deposito);
+      } else {
+        mostrarVista('vistaIdentificacion');
+      }
+    }
+
+    function mostrarVista(id) {
+      ['vistaIdentificacion', 'vistaCategorias', 'vistaConteo', 'vistaSalir', 'vistaQr'].forEach(function (v) {
+        document.getElementById(v).classList.toggle('hidden', v !== id);
+      });
+    }
+
+    // ---- QR de acceso: apunta a esta misma página, así funciona sin importar
+    // dónde termine publicada (GitHub Pages, dominio propio, etc.) ----
+    function mostrarQr() {
+      const url = location.origin + location.pathname;
+      document.getElementById('qrLinkTexto').textContent = url;
+      document.getElementById('qrImagen').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(url);
+      mostrarVista('vistaQr');
+    }
+
+    // ---- Descargar CSV con todo el conteo acumulado (pestaña "Conteo") ----
+    async function descargarCsv() {
+      document.getElementById('statusCategorias').textContent = 'Generando CSV...';
+      try {
+        const filas = await llamarApi('getConteo', []);
+        document.getElementById('statusCategorias').textContent = '';
+        if (!filas || filas.length <= 1) {
+          alert('Todavía no hay conteos guardados.');
+          return;
+        }
+        const csv = filas.map(function (fila) {
+          return fila.map(function (celda) {
+            const texto = String(celda === null || celda === undefined ? '' : celda).replace(/"/g, '""');
+            return '"' + texto + '"';
+          }).join(',');
+        }).join('\r\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Inventario_Conteo_' + new Date().toISOString().slice(0, 10) + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        document.getElementById('statusCategorias').textContent = 'Error generando CSV: ' + err.message;
+      }
+    }
+
+    function empezar() {
+      const nombre = document.getElementById('nombreInput').value.trim();
+      const deposito = document.getElementById('depositoInput').value;
+      if (!nombre) {
+        document.getElementById('statusIdentificacion').textContent = 'Ingresá tu nombre.';
+        return;
+      }
+      localStorage.setItem(NOMBRE_KEY, nombre);
+      localStorage.setItem(DEPOSITO_KEY, deposito);
+      mostrarCategorias(nombre, deposito);
+    }
+
+    function cambiarUsuario() {
+      if (confirm('¿Cambiar de usuario o depósito en este celular?')) {
+        localStorage.removeItem(NOMBRE_KEY);
+        localStorage.removeItem(DEPOSITO_KEY);
+        mostrarVista('vistaIdentificacion');
+      }
+    }
+
+    async function mostrarCategorias(nombre, deposito) {
+      document.getElementById('usuarioTexto').textContent = nombre;
+      document.getElementById('depositoTexto').textContent = deposito;
+      mostrarVista('vistaCategorias');
+      document.getElementById('statusCategorias').textContent = 'Cargando categorías...';
+      try {
+        const categorias = await llamarApi('getCategorias', [deposito]);
+        document.getElementById('statusCategorias').textContent = '';
+        const cont = document.getElementById('listaCategorias');
+        if (!categorias.length) {
+          cont.innerHTML = '';
+          document.getElementById('statusCategorias').textContent = 'Todavía no hay categorías cargadas en la planilla ("Maestro").';
+          return;
+        }
+        cont.innerHTML = categorias.map(function (c) {
+          return '<button class="cat-btn" onclick="elegirCategoria(' + JSON.stringify(c) + ')">📦 ' + c + '</button>';
+        }).join('');
+      } catch (err) {
+        document.getElementById('statusCategorias').textContent = 'Error: ' + err.message;
+      }
+    }
+
+    async function elegirCategoria(categoria) {
+      categoriaActual = categoria;
+      document.getElementById('categoriaTexto').textContent = categoria;
+      mostrarVista('vistaConteo');
+      document.getElementById('statusConteo').textContent = 'Cargando productos...';
+      try {
+        const deposito = localStorage.getItem(DEPOSITO_KEY);
+        listaProductos = await llamarApi('getProductosPorCategoria', [categoria, deposito]);
+        document.getElementById('statusConteo').textContent = '';
+        indiceActual = 0;
+        if (!listaProductos.length) {
+          document.getElementById('statusConteo').textContent = 'Esta categoría no tiene productos cargados.';
+          setTimeout(function () { mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY)); }, 1500);
+          return;
+        }
+        renderProductoActual();
+      } catch (err) {
+        document.getElementById('statusConteo').textContent = 'Error: ' + err.message;
+      }
+    }
+
+    function renderProductoActual() {
+      if (indiceActual >= listaProductos.length) {
+        document.getElementById('statusConteo').textContent = '¡Categoría completa! Volviendo al menú...';
+        document.getElementById('codigoTexto').textContent = '';
+        document.getElementById('nombreProductoTexto').textContent = '';
+        setTimeout(function () { mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY)); }, 1200);
+        return;
+      }
+      const p = listaProductos[indiceActual];
+      document.getElementById('codigoTexto').textContent = p.codigo;
+      document.getElementById('nombreProductoTexto').textContent = p.nombre;
+      document.getElementById('progresoTexto').textContent = (indiceActual + 1) + ' de ' + listaProductos.length;
+      document.getElementById('barraRellena').style.width = Math.round(((indiceActual) / listaProductos.length) * 100) + '%';
+      document.getElementById('cantidadInput').value = 0;
+      document.getElementById('statusConteo').textContent = '';
+    }
+
+    function sumarCantidad(delta) {
+      const input = document.getElementById('cantidadInput');
+      const val = Math.max(0, (parseInt(input.value, 10) || 0) + delta);
+      input.value = val;
+    }
+
+    function guardarYSiguiente() {
+      const p = listaProductos[indiceActual];
+      const cantidad = document.getElementById('cantidadInput').value;
+      const nombre = localStorage.getItem(NOMBRE_KEY);
+      const deposito = localStorage.getItem(DEPOSITO_KEY);
+      const params = [nombre, deposito, categoriaActual, p.codigo, p.nombre, cantidad];
+      document.getElementById('statusConteo').textContent = 'Guardando...';
+      llamarApi('guardarConteo', params)
+        .then(function () {
+          indiceActual++;
+          renderProductoActual();
+        })
+        .catch(function (err) {
+          if (err.networkError) {
+            encolarConteo(params);
+            indiceActual++;
+            renderProductoActual();
+            document.getElementById('statusConteo').textContent = 'Sin conexión — se guardó localmente, se manda solo apenas vuelva la señal.';
+            return;
+          }
+          document.getElementById('statusConteo').textContent = 'Error: ' + err.message;
+        });
+    }
+
+    function saltarProducto() {
+      indiceActual++;
+      renderProductoActual();
+    }
+
+    function pedirSalir() {
+      const pendientes = listaProductos.length - indiceActual;
+      document.getElementById('mensajeSalir').textContent = pendientes > 0
+        ? 'Te faltan contar ' + pendientes + ' código(s) de "' + categoriaActual + '". ¿Querés salir igual o seguir contando?'
+        : '¿Salir de "' + categoriaActual + '"?';
+      mostrarVista('vistaSalir');
+    }
+
+    function cancelarSalir() {
+      mostrarVista('vistaConteo');
+    }
+
+    function confirmarSalir() {
+      mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY));
+    }
+  </script>
+</body>
+</html>
