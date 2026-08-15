@@ -315,9 +315,15 @@
       mostrarVista('vistaCategorias');
       document.getElementById('statusCategorias').textContent = 'Cargando catálogo...';
       try {
-        const [maestro, conteoRows] = await Promise.all([
-          llamarApi('getMaestro', [deposito]),
-          llamarApi('getConteo', [])
+        // Apps Script a veces tarda mucho en arrancar en frío. Si pasan 20
+        // segundos sin respuesta, se corta la espera y se ofrece reintentar,
+        // en vez de dejar el texto "Cargando..." pegado para siempre.
+        const timeout = new Promise(function (_, reject) {
+          setTimeout(function () { reject(new Error('Está tardando más de lo normal.')); }, 20000);
+        });
+        const [maestro, conteoRows] = await Promise.race([
+          Promise.all([llamarApi('getMaestro', [deposito]), llamarApi('getConteo', [])]),
+          timeout
         ]);
         maestroDeposito = maestro;
 
@@ -346,7 +352,9 @@
           return "<button class=\"cat-btn\" onclick='elegirCategoria(" + JSON.stringify(c) + ")'>📦 " + c + '</button>';
         }).join('');
       } catch (err) {
-        document.getElementById('statusCategorias').textContent = 'Error: ' + err.message;
+        document.getElementById('statusCategorias').innerHTML =
+          'Error: ' + err.message +
+          "<br><span class=\"link-reset\" style=\"margin-top:8px;\" onclick='mostrarCategorias(" + JSON.stringify(nombre) + ',' + JSON.stringify(deposito) + ")'>🔄 Reintentar</span>";
       }
     }
 
