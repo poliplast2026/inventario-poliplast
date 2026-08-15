@@ -68,6 +68,14 @@
     .stepper input { text-align: center; margin: 0; font-size: 22px; font-weight: 700; }
     .link-reset { display:block; text-align:center; margin-top:16px; font-size:12px; color:#64748b; text-decoration: underline; cursor:pointer; }
     .link-salir { display:block; text-align:center; margin-top:6px; font-size:12px; color:#f87171; text-decoration: underline; cursor:pointer; }
+    .resultado-item {
+      background: #273449; border: 1px solid #334155; border-radius: 10px;
+      padding: 12px; margin-bottom: 8px; cursor: pointer;
+    }
+    .resultado-item:active { background: #334155; }
+    .resultado-codigo { font-weight: 700; font-size: 14px; }
+    .resultado-nombre { font-size: 13px; color: #94a3b8; }
+    .resultado-categoria { font-size: 11px; color: #64748b; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -86,8 +94,14 @@
   <div class="card hidden" id="vistaCategorias">
     <div class="usuario" id="usuarioTexto"></div>
     <div class="deposito" id="depositoTexto"></div>
-    <div class="sub">Elegí la categoría que vas a contar</div>
-    <div class="categorias" id="listaCategorias"></div>
+    <label class="campo">Buscar por código o nombre</label>
+    <input type="text" id="buscarInput" placeholder="Ej: PRFV-2X2MM-1 o balde" oninput="buscarProducto()">
+    <div id="resultadosBusqueda"></div>
+
+    <div id="bloqueCategorias">
+      <div class="sub">Elegí la categoría que vas a contar</div>
+      <div class="categorias" id="listaCategorias"></div>
+    </div>
     <div class="status" id="statusCategorias"></div>
     <div class="status" id="indicadorCola" style="color:#f59e0b;"></div>
     <div class="link-reset" onclick="descargarCsv()">⬇️ Descargar CSV del conteo</div>
@@ -143,6 +157,9 @@
     let listaProductos = [];
     let indiceActual = 0;
     let maestroDeposito = [];
+    // Mapa "deposito|codigo" -> {usuario, hora, cantidad} del último conteo
+    // guardado para ese producto, para avisar si se va a contar de nuevo.
+    let conteoExistente = {};
 
     // ---- Llamadas al backend (Google Apps Script) ----
     function llamarApi(action, params) {
@@ -293,10 +310,23 @@
     async function mostrarCategorias(nombre, deposito) {
       document.getElementById('usuarioTexto').textContent = nombre;
       document.getElementById('depositoTexto').textContent = deposito;
+      document.getElementById('buscarInput').value = '';
+      document.getElementById('resultadosBusqueda').innerHTML = '';
       mostrarVista('vistaCategorias');
       document.getElementById('statusCategorias').textContent = 'Cargando catálogo...';
       try {
-        maestroDeposito = await llamarApi('getMaestro', [deposito]);
+        const [maestro, conteoRows] = await Promise.all([
+          llamarApi('getMaestro', [deposito]),
+          llamarApi('getConteo', [])
+        ]);
+        maestroDeposito = maestro;
+
+        conteoExistente = {};
+        for (let i = 1; i < conteoRows.length; i++) {
+          const fila = conteoRows[i];
+          conteoExistente[fila[3] + '|' + fila[5]] = { usuario: fila[2], hora: fila[1], cantidad: fila[7] };
+        }
+
         document.getElementById('statusCategorias').textContent = '';
         const vistas = {};
         const categorias = [];
@@ -318,6 +348,48 @@
       } catch (err) {
         document.getElementById('statusCategorias').textContent = 'Error: ' + err.message;
       }
+    }
+
+    // ---- Buscador por código o nombre (dentro del depósito ya elegido) ----
+    function buscarProducto() {
+      const termino = document.getElementById('buscarInput').value.trim().toLowerCase();
+      const resultados = document.getElementById('resultadosBusqueda');
+      const bloqueCategorias = document.getElementById('bloqueCategorias');
+
+      if (!termino) {
+        resultados.innerHTML = '';
+        bloqueCategorias.classList.remove('hidden');
+        return;
+      }
+      bloqueCategorias.classList.add('hidden');
+
+      const coincidencias = maestroDeposito.filter(function (p) {
+        return p.codigo.toLowerCase().indexOf(termino) !== -1 || p.nombre.toLowerCase().indexOf(termino) !== -1;
+      }).slice(0, 12);
+
+      if (!coincidencias.length) {
+        resultados.innerHTML = '<div class="status">Sin resultados.</div>';
+        return;
+      }
+      resultados.innerHTML = coincidencias.map(function (p, i) {
+        return '<div class="resultado-item" onclick="contarProductoDirecto(' + i + ')">'
+          + '<div class="resultado-codigo">' + p.codigo + '</div>'
+          + '<div class="resultado-nombre">' + p.nombre + '</div>'
+          + '<div class="resultado-categoria">📦 ' + p.categoria + '</div>'
+          + '</div>';
+      }).join('');
+      window.__resultadosBusqueda = coincidencias;
+    }
+
+    function contarProductoDirecto(indice) {
+      const p = window.__resultadosBusqueda[indice];
+      categoriaActual = p.categoria;
+      document.getElementById('categoriaTexto').textContent = p.categoria;
+      mostrarVista('vistaConteo');
+      listaProductos = [{ codigo: p.codigo, nombre: p.nombre }];
+      indiceActual = 0;
+      document.getElementById('statusConteo').textContent = '';
+      renderProductoActual();
     }
 
     function elegirCategoria(categoria) {
@@ -365,16 +437,29 @@
       const cantidad = document.getElementById('cantidadInput').value;
       const nombre = localStorage.getItem(NOMBRE_KEY);
       const deposito = localStorage.getItem(DEPOSITO_KEY);
+      const clave = deposito + '|' + p.codigo;
+
+      const previo = conteoExistente[clave];
+      if (previo) {
+        const seguir = confirm(
+          'Este producto ya fue contado por ' + previo.usuario + ' a las ' + previo.hora +
+          ' con cantidad ' + previo.cantidad + '.\n\n¿Confirmás igual? Se va a guardar un nuevo registro con cantidad ' + cantidad + '.'
+        );
+        if (!seguir) return;
+      }
+
       const params = [nombre, deposito, categoriaActual, p.codigo, p.nombre, cantidad];
       document.getElementById('statusConteo').textContent = 'Guardando...';
       llamarApi('guardarConteo', params)
         .then(function () {
+          conteoExistente[clave] = { usuario: nombre, hora: 'recién', cantidad: cantidad };
           indiceActual++;
           renderProductoActual();
         })
         .catch(function (err) {
           if (err.networkError) {
             encolarConteo(params);
+            conteoExistente[clave] = { usuario: nombre, hora: 'recién', cantidad: cantidad };
             indiceActual++;
             renderProductoActual();
             document.getElementById('statusConteo').textContent = 'Sin conexión — se guardó localmente, se manda solo apenas vuelva la señal.';
