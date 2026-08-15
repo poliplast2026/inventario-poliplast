@@ -142,6 +142,7 @@
     let categoriaActual = null;
     let listaProductos = [];
     let indiceActual = 0;
+    let maestroDeposito = [];
 
     // ---- Llamadas al backend (Google Apps Script) ----
     function llamarApi(action, params) {
@@ -286,18 +287,29 @@
       }
     }
 
+    // Trae TODO el catálogo del depósito de una sola vez (no una llamada por
+    // categoría), así elegir una categoría es instantáneo y no puede haber
+    // dos pedidos de red en vuelo al mismo tiempo pisándose entre sí.
     async function mostrarCategorias(nombre, deposito) {
       document.getElementById('usuarioTexto').textContent = nombre;
       document.getElementById('depositoTexto').textContent = deposito;
       mostrarVista('vistaCategorias');
-      document.getElementById('statusCategorias').textContent = 'Cargando categorías...';
+      document.getElementById('statusCategorias').textContent = 'Cargando catálogo...';
       try {
-        const categorias = await llamarApi('getCategorias', [deposito]);
+        maestroDeposito = await llamarApi('getMaestro', [deposito]);
         document.getElementById('statusCategorias').textContent = '';
+        const vistas = {};
+        const categorias = [];
+        maestroDeposito.forEach(function (p) {
+          if (!vistas[p.categoria]) {
+            vistas[p.categoria] = true;
+            categorias.push(p.categoria);
+          }
+        });
         const cont = document.getElementById('listaCategorias');
         if (!categorias.length) {
           cont.innerHTML = '';
-          document.getElementById('statusCategorias').textContent = 'Todavía no hay categorías cargadas en la planilla ("Maestro").';
+          document.getElementById('statusCategorias').textContent = 'Todavía no hay categorías cargadas en la planilla ("Maestro") para este depósito.';
           return;
         }
         cont.innerHTML = categorias.map(function (c) {
@@ -308,25 +320,21 @@
       }
     }
 
-    async function elegirCategoria(categoria) {
+    function elegirCategoria(categoria) {
       categoriaActual = categoria;
       document.getElementById('categoriaTexto').textContent = categoria;
       mostrarVista('vistaConteo');
-      document.getElementById('statusConteo').textContent = 'Cargando productos...';
-      try {
-        const deposito = localStorage.getItem(DEPOSITO_KEY);
-        listaProductos = await llamarApi('getProductosPorCategoria', [categoria, deposito]);
-        document.getElementById('statusConteo').textContent = '';
-        indiceActual = 0;
-        if (!listaProductos.length) {
-          document.getElementById('statusConteo').textContent = 'Esta categoría no tiene productos cargados.';
-          setTimeout(function () { mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY)); }, 1500);
-          return;
-        }
-        renderProductoActual();
-      } catch (err) {
-        document.getElementById('statusConteo').textContent = 'Error: ' + err.message;
+      listaProductos = maestroDeposito
+        .filter(function (p) { return p.categoria === categoria; })
+        .map(function (p) { return { codigo: p.codigo, nombre: p.nombre }; });
+      indiceActual = 0;
+      document.getElementById('statusConteo').textContent = '';
+      if (!listaProductos.length) {
+        document.getElementById('statusConteo').textContent = 'Esta categoría no tiene productos cargados.';
+        setTimeout(function () { mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY)); }, 1500);
+        return;
       }
+      renderProductoActual();
     }
 
     function renderProductoActual() {
@@ -385,17 +393,4 @@
       const pendientes = listaProductos.length - indiceActual;
       document.getElementById('mensajeSalir').textContent = pendientes > 0
         ? 'Te faltan contar ' + pendientes + ' código(s) de "' + categoriaActual + '". ¿Querés salir igual o seguir contando?'
-        : '¿Salir de "' + categoriaActual + '"?';
-      mostrarVista('vistaSalir');
-    }
-
-    function cancelarSalir() {
-      mostrarVista('vistaConteo');
-    }
-
-    function confirmarSalir() {
-      mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY));
-    }
-  </script>
-</body>
-</html>
+        : '¿
