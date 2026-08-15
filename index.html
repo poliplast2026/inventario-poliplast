@@ -133,7 +133,7 @@
   <script>
     // ⚠️ URL del Apps Script de Inventario (/exec). Si alguna vez se crea una
     // implementación nueva (en vez de "Nueva versión" sobre la misma), hay que actualizarla.
-    const API_URL = 'https://script.google.com/macros/s/AKfycbyGdhpzT7owDBPt1fhUiiREHKGD7xQ7p1MIiC5M5SFVDTEugJGbC4AKCSH3RDTzXDLbNA/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwhtHHtGbRrqPDrKRLajx1DNGbJ_IcDl__qIXp0siu5XIZeNSExPNBGORBRBAKMMcUYNg/exec';
 
     const NOMBRE_KEY = 'inventario_nombre';
     const DEPOSITO_KEY = 'inventario_deposito';
@@ -393,4 +393,17 @@
       const pendientes = listaProductos.length - indiceActual;
       document.getElementById('mensajeSalir').textContent = pendientes > 0
         ? 'Te faltan contar ' + pendientes + ' código(s) de "' + categoriaActual + '". ¿Querés salir igual o seguir contando?'
-        : '¿
+        : '¿Salir de "' + categoriaActual + '"?';
+      mostrarVista('vistaSalir');
+    }
+
+    function cancelarSalir() {
+      mostrarVista('vistaConteo');
+    }
+
+    function confirmarSalir() {
+      mostrarCategorias(localStorage.getItem(NOMBRE_KEY), localStorage.getItem(DEPOSITO_KEY));
+    }
+  </script>
+</body>
+</html>
